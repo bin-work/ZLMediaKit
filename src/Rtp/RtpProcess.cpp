@@ -64,7 +64,7 @@ RtpProcess::~RtpProcess() {
     }
 }
 
-bool RtpProcess::inputRtp(bool is_udp, const Socket::Ptr &sock, const char *data, size_t len, const struct sockaddr *addr, uint32_t *dts_out) {
+bool RtpProcess::inputRtp(bool is_udp, const Socket::Ptr &sock, const char *data, size_t len, const struct sockaddr *addr, uint64_t *dts_out) {
     auto is_busy = _busy_flag.test_and_set();
     if (is_busy) {
         //其他线程正在执行本函数
@@ -244,17 +244,24 @@ void RtpProcess::emitOnPublish() {
         if (!strong_self) {
             return;
         }
-        if (err.empty()) {
-            strong_self->_muxer = std::make_shared<MultiMediaSourceMuxer>(strong_self->_media_info._vhost,
-                                                                          strong_self->_media_info._app,
-                                                                          strong_self->_media_info._streamid, 0.0f,
-                                                                          option);
-            strong_self->_muxer->setMediaListener(strong_self);
-            strong_self->doCachedFunc();
-            InfoP(strong_self) << "允许RTP推流";
-        } else {
-            WarnP(strong_self) << "禁止RTP推流:" << err;
-        }
+        auto poller = strong_self->_sock ? strong_self->_sock->getPoller() : EventPollerPool::Instance().getPoller();
+        poller->async([weak_self, err, option]() {
+            auto strong_self = weak_self.lock();
+            if (!strong_self) {
+                return;
+            }
+            if (err.empty()) {
+                strong_self->_muxer = std::make_shared<MultiMediaSourceMuxer>(strong_self->_media_info._vhost,
+                                                                              strong_self->_media_info._app,
+                                                                              strong_self->_media_info._streamid,0.0f,
+                                                                              option);
+                strong_self->_muxer->setMediaListener(strong_self);
+                strong_self->doCachedFunc();
+                InfoP(strong_self) << "允许RTP推流";
+            } else {
+                WarnP(strong_self) << "禁止RTP推流:" << err;
+            }
+        });
     };
 
     //触发推流鉴权事件
@@ -278,7 +285,23 @@ std::shared_ptr<SockInfo> RtpProcess::getOriginSock(MediaSource &sender) const {
 }
 
 toolkit::EventPoller::Ptr RtpProcess::getOwnerPoller(MediaSource &sender) {
-    return _sock ? _sock->getPoller() : nullptr;
+    return _sock ? _sock->getPoller() : EventPollerPool::Instance().getPoller();
+}
+
+void RtpProcess::setHelper(std::weak_ptr<RtcpContext> help) {
+	_help = std::move(help);
+}
+
+int RtpProcess::getLossRate(MediaSource &sender, TrackType type) {
+     auto help = _help.lock();
+	 if (!help) {
+	 	return -1;	
+	 }
+     auto expected =  help->getExpectedPacketsInterval();
+     if (!expected) {
+        return 0;
+     }
+     return help->geLostInterval() * 100 / expected;
 }
 
 }//namespace mediakit

@@ -25,8 +25,8 @@ void RtpSelector::clear(){
     _map_rtp_process.clear();
 }
 
-bool RtpSelector::inputRtp(const Socket::Ptr &sock, const char *data, size_t data_len,
-                           const struct sockaddr *addr,uint32_t *dts_out) {
+bool RtpSelector::inputRtp(const Socket::Ptr &sock, const char *data, size_t data_len, const struct sockaddr *addr,
+                           uint64_t *dts_out) {
     uint32_t ssrc = 0;
     if (!getSSRC(data, data_len, ssrc)) {
         WarnL << "get ssrc from rtp failed:" << data_len;
@@ -120,12 +120,6 @@ void RtpSelector::onManager() {
     });
 }
 
-RtpSelector::RtpSelector() {
-}
-
-RtpSelector::~RtpSelector() {
-}
-
 RtpProcessHelper::RtpProcessHelper(const string &stream_id, const weak_ptr<RtpSelector> &parent) {
     _stream_id = stream_id;
     _parent = parent;
@@ -136,6 +130,7 @@ RtpProcessHelper::~RtpProcessHelper() {
 }
 
 void RtpProcessHelper::attachEvent() {
+    //主要目的是close回调触发时能把对象从RtpSelector中删除
     _process->setListener(shared_from_this());
 }
 
@@ -155,6 +150,10 @@ bool RtpProcessHelper::close(MediaSource &sender, bool force) {
 
 int RtpProcessHelper::totalReaderCount(MediaSource &sender) {
     return _process ? _process->getTotalReaderCount() : sender.totalReaderCount();
+}
+
+toolkit::EventPoller::Ptr RtpProcessHelper::getOwnerPoller(MediaSource &sender) {
+    return toolkit::EventPollerPool::Instance().getPoller();
 }
 
 RtpProcess::Ptr &RtpProcessHelper::getProcess() {

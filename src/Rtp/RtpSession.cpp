@@ -59,7 +59,7 @@ void RtpSession::onRecv(const Buffer::Ptr &data) {
 }
 
 void RtpSession::onError(const SockException &err) {
-    WarnL << _stream_id << " " << err.what();
+    WarnP(this) << _stream_id << " " << err.what();
 }
 
 void RtpSession::onManager() {
@@ -137,6 +137,10 @@ bool RtpSession::close(MediaSource &sender, bool force) {
 int RtpSession::totalReaderCount(MediaSource &sender) {
     //此回调在其他线程触发
     return _process ? _process->getTotalReaderCount() : sender.totalReaderCount();
+}
+
+toolkit::EventPoller::Ptr RtpSession::getOwnerPoller(MediaSource &sender) {
+    return getPoller();
 }
 
 static const char *findSSRC(const char *data, ssize_t len, uint32_t ssrc) {

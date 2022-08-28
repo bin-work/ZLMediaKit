@@ -31,6 +31,8 @@ public:
     bool enable_hls = false;
     //是否开启MP4录制
     bool enable_mp4 = false;
+    //是否将mp4录制当做观看者
+    bool mp4_as_player = false;
     //是否开启转换为rtsp/webrtc
     bool enable_rtsp = true;
     //是否开启转换为rtmp/flv
@@ -152,6 +154,10 @@ public:
      */
     std::vector<Track::Ptr> getMediaTracks(MediaSource &sender, bool trackReady = true) const override;
 
+    const std::string& getVhost() const;
+    const std::string& getApp() const;
+    const std::string& getStreamId() const;
+
 protected:
     /////////////////////////////////MediaSink override/////////////////////////////////
 
@@ -175,6 +181,10 @@ protected:
 
 private:
     bool _is_enable = false;
+    std::string _vhost;
+    std::string _app;
+    std::string _stream_id;
+    ProtocolOption _option;
     toolkit::Ticker _last_check;
     Stamp _stamp[2];
     std::weak_ptr<Listener> _track_listener;
